@@ -22,7 +22,7 @@ def centroid(listPixel, dim):
 
 def superpixel(image, k, maxIter = 5):
 	"""
-	Computes the superpixel algorithm on an image
+	Computes the SLIC algorithm on an image with k**2 superpixels
 	"""
 	#Normalize
 	image = image/255
@@ -39,33 +39,41 @@ def superpixel(image, k, maxIter = 5):
 	norm = np.sqrt(image.shape[0]**2 + image.shape[1]**2)
 	# Result image
 	res = np.zeros(image.shape)
+	centroidMatrix = np.full((image.shape[0], image.shape[1]), -1, dtype=int)
+
 	for iteration in range(maxIter):
 		print("Computing iteration : {} / {}".format(iteration+1,maxIter))
 		# Iteration assignement
 		assignements = {key: [] for key in range(sk)}
 		assignementsPositions = {key: [] for key in range(sk)}
+		# Initialize distance to closest centroid
+		distanceMatrix = np.full((image.shape[0], image.shape[1], 1), np.inf)
 
-		# Loop over all pixel
-		# TODO : Iter on centroid and search only in a window of 2si x 2sj around centroid
-		for i in range(image.shape[0]):
-			for j in range(image.shape[1]):
-				pixel = image[i][j]
-				# Computes distances to each centroid
-				closestCentroid = -1
-				ccdist = 100000
-				for c, ci in zip(centroids, range(sk)):
+		# Iter on centroid and search only in a window of 2si x 2sj around centroid
+		for c, ci in zip(centroids, range(sk)):
+			for i in range(max(0, int(centroidsPosition[ci][0] - si)), min(image.shape[0], int(centroidsPosition[ci][0] + si))):
+				for j in range(max(0, int(centroidsPosition[ci][1] - sj)), min(image.shape[1], int(centroidsPosition[ci][1] + sj))):
+					pixel = image[i][j]
+					ccdist = distanceMatrix[i][j]
 					# Distance which takes into account distance to centroid
 					cdist = distance(pixel, c) + 15*distance([i,j], centroidsPosition[ci])/norm
 					if cdist < ccdist :
-						ccdist = cdist
-						closestCentroid = ci
+						distanceMatrix[i][j] = cdist
+						centroidMatrix[i][j] = ci
+
+		# Assign pixels
+		for i in range(image.shape[0]):
+			for j in range(image.shape[1]):
+				pixel = image[i][j]
+				closestCentroid = centroidMatrix[i][j]
 				# Assignement
 				assignements[closestCentroid].append(pixel)
 				assignementsPositions[closestCentroid].append(np.array([i,j]))
 				res[i][j] = centroids[closestCentroid]*255
+
 		# Updates centroids
 		for i in range(sk):
-			centroids[i] = centroid(assignements[i],3)
+			centroids[i] = centroid(assignements[i],image.shape[2])
 			centroidsPosition[i] = centroid(assignementsPositions[i],2)
 
 		#TODO : Ensure connectivity
